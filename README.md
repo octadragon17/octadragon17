@@ -28,5 +28,5 @@ Ingeniero en Sistemas con Maestría en Cómputo Ubicuo y más de 15 años llevan
 
 ### 📫 Contacto
 
-- LinkedIn: _(agrega aquí tu URL)_
+- LinkedIn: [José Octavio Moreno Aldana](https://www.linkedin.com/in/jos%C3%A9-octavio-moreno-aldana-5a531589)
 - Web: [proyecto12.digital](https://proyecto12.digital)
