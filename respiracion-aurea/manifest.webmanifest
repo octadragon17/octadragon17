@@ -1,0 +1,17 @@
+{
+  "name": "Vórtice Áureo",
+  "short_name": "Vórtice",
+  "description": "Respiración consciente en proporción áurea: 13, 8, 5, 3, 2, 1 y retención.",
+  "lang": "es-MX",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1419",
+  "theme_color": "#0d1419",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

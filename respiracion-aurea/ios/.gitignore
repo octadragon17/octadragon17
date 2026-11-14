@@ -1,0 +1,5 @@
+VorticeAureo/web/
+VorticeAureo/Info.plist
+*.xcodeproj/
+build/
+DerivedData/

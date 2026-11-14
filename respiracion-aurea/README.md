@@ -34,7 +34,7 @@ Añade voz guía con el TTS del teléfono (es-MX), vibración nativa y pantalla 
 ```bash
 # Ubuntu 24.04 / WSL
 sudo apt-get install -y aapt zipalign apksigner android-sdk-platform-23 dalvik-exchange openjdk-17-jdk
-cd android && ./build.sh        # -> android/build/VorticeAureo.apk
+cd android && ./build.sh        # -> android/build/VorticeAureo.apk (usa ../index.html y ../fonts)
 ```
 
 - minSdk 21 (Android 5.0), targetSdk 34. ~110 KB.
@@ -42,5 +42,28 @@ cd android && ./build.sh        # -> android/build/VorticeAureo.apk
   las actualizaciones solo se instalan encima si están firmadas con la misma llave.
 - Instalación: copiar el APK al teléfono → abrirlo → permitir "Instalar apps desconocidas".
 
+## PWA para iPhone / iPad (sin App Store, sin costo)
+La misma app se instala desde Safari y funciona sin internet (service worker `sw.js`, `manifest.webmanifest`).
+Requiere publicarse en un sitio **https** (GitHub Pages, Vercel o cPanel con SSL).
+
+1. Abrir la URL en **Safari** → botón **Compartir** → **Agregar a pantalla de inicio**.
+2. Abrirla una vez con internet; desde ahí funciona en modo avión.
+3. Para publicar cambios, subir `VERSION` en `sw.js`.
+
+Limitaciones en iOS: no hay vibración; la voz depende de las voces en español instaladas.
+
+## App nativa iOS (Xcode)
+`ios/` contiene un contenedor SwiftUI + WKWebView (iOS 16+), con voz nativa (AVSpeechSynthesizer es-MX),
+háptica, audio que ignora el interruptor de silencio y pantalla siempre encendida.
+
+```bash
+# macOS con Xcode instalado
+brew install xcodegen
+cd ios && ./sync-web.sh && xcodegen && open VorticeAureo.xcodeproj
+```
+En Xcode: **Signing & Capabilities** → elegir tu Team (Apple ID) → conectar el iPhone → **Run**.
+- Con Apple ID gratuito la app caduca a los 7 días (hay que volver a instalarla desde Xcode).
+- Para TestFlight / App Store se necesita el Apple Developer Program (cuota anual).
+
 ## Descarga directa del APK
-[VorticeAureo.apk (v1.1)](https://github.com/octadragon17/octadragon17/raw/claude/conscious-breathing-app-94y10d/respiracion-aurea/descargas/VorticeAureo.apk)
+[VorticeAureo.apk (v1.2)](https://github.com/octadragon17/octadragon17/raw/claude/conscious-breathing-app-94y10d/respiracion-aurea/descargas/VorticeAureo.apk)

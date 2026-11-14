@@ -2,8 +2,15 @@
 <title>Vórtice Áureo</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Respiración consciente en proporción áurea: 13, 8, 5, 3, 2, 1 y retención.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1419">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vórtice Áureo">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <style>
 /* Layout: espiral de Fibonacci a la izquierda (arriba en móvil) + panel de control; una sola pantalla */
 :root{
@@ -212,7 +219,7 @@ button[hidden]{display:none}
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .05); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
     o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + .05);
   }
-  const NATIVE = window.AndroidBridge || null;
+  const NATIVE = window.NativeBridge || window.AndroidBridge || null;
   function say(txt){
     if (!ui.voice.checked) return;
     if (NATIVE) { try { NATIVE.speak(txt); } catch(e){} return; }
@@ -324,6 +331,8 @@ button[hidden]{display:none}
   }
 
   function start(){
+    // iOS/Safari: que el audio suene aunque el interruptor de silencio esté activado
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch(e){}
     if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
     if (ac && ac.state === 'suspended') ac.resume();
     if (ui.music.checked) Music.start();
@@ -438,5 +447,11 @@ button[hidden]{display:none}
 
   buildPlan(); renderTrack(); syncButtons(); updateReadout(); size(); requestAnimationFrame(frame);
 })();
+</script>
+<script>
+  // PWA: funciona sin internet una vez abierta desde un sitio https (no aplica en file:// ni en las apps nativas)
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
 </script>
 </body></html>

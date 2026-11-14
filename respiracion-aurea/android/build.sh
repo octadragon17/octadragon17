@@ -13,11 +13,9 @@ KS_PASS=${KS_PASS:-vortice-aureo}
 OUT=build
 rm -rf "$OUT"; mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/assets"
 
-# 1) Web app -> assets, con fuentes locales en lugar de Google Fonts
-cp -r assets/fonts "$OUT/assets/"
-sed -e '/fonts.googleapis.com\|fonts.gstatic.com/d' \
-    -e 's|</title>|</title>\n<link rel="stylesheet" href="fonts/fonts.css">|' \
-    ../index.html > "$OUT/assets/index.html"
+# 1) Web app -> assets (fuentes locales, sin recursos externos)
+cp -r ../fonts ../icons ../manifest.webmanifest "$OUT/assets/"
+cp ../index.html "$OUT/assets/index.html"
 if grep -q 'googleapis' "$OUT/assets/index.html"; then echo "Quedó una referencia externa" >&2; exit 1; fi
 
 # 2) Recursos + R.java
