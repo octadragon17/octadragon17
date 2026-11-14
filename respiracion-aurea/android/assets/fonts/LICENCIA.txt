@@ -1,0 +1,2 @@
+Sora (Jonathan Barnbrook, Julián Moncada) e IBM Plex Mono (IBM) se distribuyen bajo la
+SIL Open Font License 1.1: https://openfontlicense.org — se permite incluirlas en software.

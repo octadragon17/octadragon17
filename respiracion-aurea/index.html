@@ -49,6 +49,7 @@ button[hidden]{display:none}
 .field select{font:inherit;font-size:.95rem;text-transform:none;letter-spacing:0;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
 .toggle{flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:.9rem;color:var(--ink)}
 .toggle input{width:18px;height:18px;accent-color:var(--gold)}
+.field input[type=range]{accent-color:var(--gold);width:100%}
 .note{font-size:.78rem;color:var(--muted);line-height:1.5;margin:0;max-width:60ch}
 @media (max-width:760px){
   .app{grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
@@ -101,8 +102,12 @@ button[hidden]{display:none}
       <label class="field toggle"><input type="checkbox" id="sound" checked> Tonos</label>
       <label class="field toggle"><input type="checkbox" id="voice"> Voz guía</label>
       <label class="field toggle"><input type="checkbox" id="tick"> Pulso por segundo</label>
+      <label class="field toggle"><input type="checkbox" id="music" checked> Música áurea de fondo</label>
+      <label class="field">Volumen de la música
+        <input type="range" id="musicVol" min="0" max="100" value="45">
+      </label>
     </div>
-    <p class="note">Respira por la nariz, sin forzar. Si sientes mareo, vuelve a tu respiración normal. No lo practiques al manejar ni dentro del agua. Barra espaciadora: iniciar / pausar.</p>
+    <p class="note">Respira por la nariz, sin forzar. Si sientes mareo, vuelve a tu respiración normal. No lo practiques al manejar ni dentro del agua. La música sigue sonando al terminar; <b>Reiniciar</b> la apaga. Barra espaciadora: iniciar / pausar.</p>
   </section>
 </main>
 
@@ -123,18 +128,19 @@ button[hidden]{display:none}
   const cv = $('spiral'), ctx = cv.getContext('2d');
   const ui = {phase:$('phase'), count:$('count'), meta:$('meta'), track:$('track'),
     start:$('btnStart'), release:$('btnRelease'), reset:$('btnReset'),
-    hold:$('hold'), rounds:$('rounds'), use8:$('use8'), sound:$('sound'), voice:$('voice'), tick:$('tick')};
+    hold:$('hold'), rounds:$('rounds'), use8:$('use8'), sound:$('sound'), voice:$('voice'), tick:$('tick'), music:$('music'), musicVol:$('musicVol')};
 
   // ---------- Preferencias locales ----------
   const PREF_KEY = 'vortice-aureo-prefs';
   try {
     const p = JSON.parse(localStorage.getItem(PREF_KEY) || '{}');
-    ['hold','rounds'].forEach(k => p[k] != null && (ui[k].value = p[k]));
-    ['use8','sound','voice','tick'].forEach(k => p[k] != null && (ui[k].checked = p[k]));
+    ['hold','rounds','musicVol'].forEach(k => p[k] != null && (ui[k].value = p[k]));
+    ['use8','sound','voice','tick','music'].forEach(k => p[k] != null && (ui[k].checked = p[k]));
   } catch(e) {}
   const savePrefs = () => { try {
     localStorage.setItem(PREF_KEY, JSON.stringify({hold:ui.hold.value, rounds:ui.rounds.value,
-      use8:ui.use8.checked, sound:ui.sound.checked, voice:ui.voice.checked, tick:ui.tick.checked}));
+      use8:ui.use8.checked, sound:ui.sound.checked, voice:ui.voice.checked, tick:ui.tick.checked,
+      music:ui.music.checked, musicVol:ui.musicVol.value}));
   } catch(e) {} };
 
   // ---------- Secuencia ----------
@@ -206,11 +212,14 @@ button[hidden]{display:none}
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .05); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
     o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + .05);
   }
+  const NATIVE = window.AndroidBridge || null;
   function say(txt){
-    if (!ui.voice.checked || !('speechSynthesis' in window)) return;
+    if (!ui.voice.checked) return;
+    if (NATIVE) { try { NATIVE.speak(txt); } catch(e){} return; }
+    if (!('speechSynthesis' in window)) return;
     try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(txt); u.lang = 'es-MX'; u.rate = .9; speechSynthesis.speak(u); } catch(e){}
   }
-  const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} };
+  const buzz = ms => { try { NATIVE ? NATIVE.vibrate(JSON.stringify([].concat(ms))) : (navigator.vibrate && navigator.vibrate(ms)); } catch(e){} };
   let wake = null;
   async function keepAwake(on){
     try {
@@ -219,6 +228,65 @@ button[hidden]{display:none}
     } catch(e) { wake = null; }
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && running) keepAwake(true); });
+
+  // ---------- Música áurea generativa (sin archivos, funciona sin internet) ----------
+  // Bordón en frecuencias de Fibonacci (89, 144, 233, 377 Hz: razón ≈ φ entre cada una),
+  // cada voz respira con un LFO de periodo Fibonacci (8, 13, 21, 34 s) y el filtro abre y cierra cada 55 s.
+  // Campanas con parciales f, f·φ, f·φ² en una escala φ^(k/4), espaciadas 3, 5, 8, 13 o 21 s.
+  const Music = (() => {
+    let out = null, wet = null, oscs = [], timer = null, on = false;
+    const SCALE = [0,1,2,3,4].map(k => 233 * Math.pow(PHI, k/4));
+    const GAPS = [3, 5, 8, 5, 13, 8, 21, 13];
+    let gi = 0, seed = 1;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const level = () => (+ui.musicVol.value / 100) * .55;
+    function impulse(){
+      const len = ac.sampleRate * 5, b = ac.createBuffer(2, len, ac.sampleRate);
+      for (let c = 0; c < 2; c++){ const d = b.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2.8); }
+      const cv = ac.createConvolver(); cv.buffer = b; return cv;
+    }
+    function osc(type, f){ const o = ac.createOscillator(); o.type = type; o.frequency.value = f; oscs.push(o); return o; }
+    function bell(){
+      if (!on) return;
+      const t = ac.currentTime + .05, f = SCALE[Math.floor(rnd() * SCALE.length)] * (rnd() < .3 ? 2 : 1);
+      [[1, .09], [PHI, .035], [PHI*PHI, .015]].forEach(([m, a]) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sine'; o.frequency.value = f * m;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + 7 / m);
+        o.connect(g); g.connect(out); g.connect(wet); o.start(t); o.stop(t + 8);
+      });
+      timer = setTimeout(bell, GAPS[gi++ % GAPS.length] * 1000);
+    }
+    function start(){
+      if (on || !ac) return; on = true;
+      const t = ac.currentTime;
+      out = ac.createGain(); out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(level(), t + 8);
+      out.connect(ac.destination);
+      wet = ac.createGain(); wet.gain.value = .6; const rv = impulse(); wet.connect(rv); rv.connect(out);
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700; lp.Q.value = .4;
+      const sweep = osc('sine', 1/55), sweepG = ac.createGain(); sweepG.gain.value = 450; sweep.connect(sweepG).connect(lp.frequency);
+      lp.connect(out); lp.connect(wet);
+      [[89, 8, .30, 'sine'], [144, 13, .20, 'triangle'], [233, 21, .11, 'sine'], [377, 34, .05, 'triangle']].forEach(([f, per, amp, type]) => {
+        [-1, 1].forEach(det => {
+          const o = osc(type, f * (1 + det * .0017)), g = ac.createGain();
+          g.gain.value = amp * .3;
+          const l = osc('sine', 1 / per), lg = ac.createGain(); lg.gain.value = amp * .2;
+          l.connect(lg).connect(g.gain); o.connect(g).connect(lp);
+        });
+      });
+      oscs.forEach(o => o.start(t));
+      timer = setTimeout(bell, 5000);
+    }
+    function stop(){
+      if (!on) return; on = false; clearTimeout(timer);
+      const t = ac.currentTime, g = out, list = oscs; oscs = [];
+      g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 4);
+      list.forEach(o => { try { o.stop(t + 4.2); } catch(e){} });
+      setTimeout(() => { try { g.disconnect(); } catch(e){} }, 4500);
+    }
+    function volume(){ if (on) { const t = ac.currentTime; out.gain.cancelScheduledValues(t); out.gain.setTargetAtTime(level(), t, .3); } }
+    return {start, stop, volume, get on(){ return on; }};
+  })();
 
   function cue(p){
     if (p.k === 'in')  { tone(330, 495, .9); say(`Inhala ${p.d}`); buzz(60); }
@@ -258,6 +326,7 @@ button[hidden]{display:none}
   function start(){
     if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
     if (ac && ac.state === 'suspended') ac.resume();
+    if (ui.music.checked) Music.start();
     if (finished) resetState();
     const fresh = idx === 0 && elapsed === 0 && round === 1;
     running = true; last = performance.now();
@@ -266,7 +335,7 @@ button[hidden]{display:none}
   }
   function pause(){ running = false; keepAwake(false); try{ speechSynthesis.cancel(); }catch(e){} syncButtons(); updateReadout(); }
   function resetState(){ running = false; finished = false; idx = 0; elapsed = 0; round = 1; lastSec = -1; buildPlan(); }
-  function reset(){ resetState(); keepAwake(false); try{ speechSynthesis.cancel(); }catch(e){} syncButtons(); renderTrack(); updateReadout(); }
+  function reset(){ resetState(); Music.stop(); keepAwake(false); try{ speechSynthesis.cancel(); }catch(e){} syncButtons(); renderTrack(); updateReadout(); }
   function syncButtons(){
     ui.start.textContent = running ? 'Pausar' : (finished ? 'Otra vez' : (idx || elapsed || round > 1 ? 'Continuar' : 'Comenzar'));
     ui.release.hidden = !(running && plan[idx] && plan[idx].k === 'hold');
@@ -279,6 +348,8 @@ button[hidden]{display:none}
   ui.reset.addEventListener('click', reset);
   [ui.hold, ui.rounds, ui.use8].forEach(el => el.addEventListener('change', () => { savePrefs(); reset(); }));
   [ui.sound, ui.voice, ui.tick].forEach(el => el.addEventListener('change', savePrefs));
+  ui.music.addEventListener('change', () => { savePrefs(); if (!ui.music.checked) Music.stop(); else if (ac && (running || finished)) Music.start(); });
+  ui.musicVol.addEventListener('input', () => { Music.volume(); savePrefs(); });
   document.addEventListener('keydown', e => {
     if (e.code === 'Space' && !/SELECT|INPUT|BUTTON/.test(e.target.tagName)) { e.preventDefault(); running ? pause() : start(); }
   });
