@@ -41,3 +41,6 @@ cd android && ./build.sh        # -> android/build/VorticeAureo.apk
 - La primera compilación crea la llave de firma en `~/.vortice-aureo/release.jks`. Respáldala:
   las actualizaciones solo se instalan encima si están firmadas con la misma llave.
 - Instalación: copiar el APK al teléfono → abrirlo → permitir "Instalar apps desconocidas".
+
+## Descarga directa del APK
+[VorticeAureo.apk (v1.1)](https://github.com/octadragon17/octadragon17/raw/claude/conscious-breathing-app-94y10d/respiracion-aurea/descargas/VorticeAureo.apk)
